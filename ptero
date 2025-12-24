@@ -169,6 +169,8 @@ while true; do
             blueprint -i huxregister.blueprint && success "huxregister installed"
             read -p $'\e[93mPress Enter to continue...\e[0m' -r
             ;;
+0)
+            exit
 10)
             clear
             print_box_header "JEXACTYL FULL PANEL MIGRATION" $NEON_PURPLE
