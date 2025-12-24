@@ -183,11 +183,19 @@ while true; do
             echo -e "${BOLD}${RED}╚══════════════════════════════════════════════════════════════╝${RESET}"
             echo
             
-            if ! confirm "Do you want to proceed with the Jexactyl migration?"; then
-                echo -e "${YELLOW}${BOLD}Migration cancelled by user.${RESET}"
-                read -p $'\e[93mPress Enter to continue...\e[0m' -r
-                continue
-            fi
+            # Inline confirmation since 'confirm' function is not found
+            while true; do
+                read -p $'\e[93mDo you want to proceed with the Jexactyl migration? (y/N): \e[0m' -r yn
+                case $yn in
+                    [Yy]* ) proceed=yes; break;;
+                    [Nn]* | "" ) 
+                        echo -e "${YELLOW}${BOLD}Migration cancelled by user.${RESET}"
+                        read -p $'\e[93mPress Enter to continue...\e[0m' -r
+                        continue 2  # Skip the rest of this option and go back to menu
+                        ;;
+                    * ) echo -e "${RED}Please answer y (yes) or n (no).${RESET}";;
+                esac
+            done
             
             progress "Navigating to panel directory..."
             cd /var/www/pterodactyl || { 
@@ -214,7 +222,7 @@ while true; do
             progress "Extracting and replacing files..."
             tar -xzvf panel.tar.gz >/dev/null && rm -f panel.tar.gz || {
                 echo -e "${RED}${BOLD}✘ Failed to extract archive.${RESET}"
-                rm -f panel.tar.gz
+                rm -f panel.tar.gz 2>/dev/null
                 php artisan up
                 read -p $'\e[93mPress Enter to continue...\e[0m' -r
                 continue
@@ -244,7 +252,7 @@ while true; do
             }
             
             progress "Fixing webserver ownership (www-data)..."
-            chown -R www-data:www-data /var/www/pterodactyl/* 2>/dev/null || echo -e "${YELLOW}ℹ Ownership fix skipped (run manually if using nginx/apache).${RESET}"
+            chown -R www-data:www-data /var/www/pterodactyl/* 2>/dev/null || echo -e "${YELLOW}ℹ Ownership fix skipped (run manually if using nginx/apache on different user).${RESET}"
             
             progress "Restarting queue workers..."
             php artisan queue:restart
@@ -268,14 +276,14 @@ while true; do
             clear
             echo -e "${DANGER}"
             cat << "EOF"
- ___      ___       __       __    __   __     ___      ___ 
-|"  \    /"  |     /""\     /" |  | "\ |" \   |"  \    /"  |
- \   \  //   |    /    \   (:  (__)  :)||  |   \   \  //   |
- /\\  \/.    |   /' /\  \   \/      \/ |:  |   /\\  \/.    |
-|: \.        |  //  __'  \  //  __  \\ |.  |  |: \.        |
-|.  \    /:  | /   /  \\  \(:  (  )  :)/\  |\ |.  \    /:  |
-|___|\__/|___|(___/    \___)\__|  |__/(__\_|_)|___|\__/|___|
-                                                           
+ ___ ___ __ __ __ __ ___ ___
+|" \ /" | /""\ /" | | "\ |" \ |" \ /" |
+ \ \ // | / \ (: (__) :)|| | \ \ // |
+ /\\ \/. | /' /\ \ \/ \/ |: | /\\ \/. |
+|: \. | // __' \ // __ \\ |. | |: \. |
+|. \ /: | / / \\ \(: ( ) :)/\ |\ |. \ /: |
+|___|\__/|___|(___/ \___)\__| |__/(__\_|_)|___|\__/|___|
+  
                                                           
 EOF
             print_box_header "GOODBYE" $DANGER
