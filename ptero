@@ -171,29 +171,97 @@ while true; do
             ;;
         10)
             clear
-            print_box_header "JEXACTYL INSTALLATION" $NEON_PURPLE
-            progress "Installing Jexactyl Theme..."
-            cd /var/www/pterodactyl || { error "Panel directory not found!"; read -p "Press Enter..."; continue; }
-           
-            # Remove old theme if exists
-            rm -rf resources/scripts/jexactyl
-           
-            # Clone Jexactyl
-            git clone https://github.com/jexactyl/jexactyl.git temp_jexactyl >/dev/null 2>&1
-            cp -r temp_jexactyl/resources/scripts/* resources/scripts/
-            rm -rf temp_jexactyl
-           
-            # Apply CSS/JS overrides
-            curl -sLo resources/scripts/jexactyl/jexactyl.css https://raw.githubusercontent.com/jexactyl/jexactyl/main/jexactyl.css
-            curl -sLo resources/scripts/jexactyl/jexactyl.js https://raw.githubusercontent.com/jexactyl/jexactyl/main/jexactyl.js
-           
-            # Clear cache
-            php artisan view:clear
-            php artisan config:clear
-            php artisan cache:clear
-           
-            success "Jexactyl theme installed successfully!"
-            echo -e "\n${YELLOW}Refresh your panel with Ctrl+Shift+R to see the new theme!${RESET}"
+            print_box_header "JEXACTYL FULL PANEL MIGRATION" $NEON_PURPLE
+            
+            echo -e "${BOLD}${RED}╔══════════════════════════════════════════════════════════════╗${RESET}"
+            echo -e "${BOLD}${RED}║                     CRITICAL WARNING                         ║${RESET}"
+            echo -e "${BOLD}${RED}║  This will COMPLETELY OVERWRITE your Pterodactyl panel       ║${RESET}"
+            echo -e "${BOLD}${RED}║  with the full Jexactyl panel (billing, ticketing, etc.).    ║${RESET}"
+            echo -e "${BOLD}${RED}║                                                              ║${RESET}"
+            echo -e "${BOLD}${RED}║  THIS ACTION IS NOT REVERSIBLE WITHOUT A BACKUP!             ║${RESET}"
+            echo -e "${BOLD}${RED}║  BACKUP YOUR FILES AND DATABASE BEFORE CONTINUING!           ║${RESET}"
+            echo -e "${BOLD}${RED}╚══════════════════════════════════════════════════════════════╝${RESET}"
+            echo
+            
+            if ! confirm "Do you want to proceed with the Jexactyl migration?"; then
+                echo -e "${YELLOW}${BOLD}Migration cancelled by user.${RESET}"
+                read -p $'\e[93mPress Enter to continue...\e[0m' -r
+                continue
+            fi
+            
+            progress "Navigating to panel directory..."
+            cd /var/www/pterodactyl || { 
+                echo -e "${RED}${BOLD}✘ Panel directory not found! (/var/www/pterodactyl)${RESET}"
+                read -p $'\e[93mPress Enter to continue...\e[0m' -r
+                continue
+            }
+            
+            progress "Placing panel in maintenance mode..."
+            php artisan down || {
+                echo -e "${RED}${BOLD}✘ Failed to enable maintenance mode.${RESET}"
+                read -p $'\e[93mPress Enter to continue...\e[0m' -r
+                continue
+            }
+            
+            progress "Downloading latest Jexactyl release..."
+            curl -L -o panel.tar.gz https://github.com/jexactyl/jexactyl/releases/latest/download/panel.tar.gz || {
+                echo -e "${RED}${BOLD}✘ Download failed. Check internet connection or GitHub status.${RESET}"
+                php artisan up
+                read -p $'\e[93mPress Enter to continue...\e[0m' -r
+                continue
+            }
+            
+            progress "Extracting and replacing files..."
+            tar -xzvf panel.tar.gz >/dev/null && rm -f panel.tar.gz || {
+                echo -e "${RED}${BOLD}✘ Failed to extract archive.${RESET}"
+                rm -f panel.tar.gz
+                php artisan up
+                read -p $'\e[93mPress Enter to continue...\e[0m' -r
+                continue
+            }
+            
+            progress "Setting storage and cache permissions..."
+            chmod -R 755 storage/* bootstrap/cache
+            
+            progress "Updating Composer dependencies..."
+            composer require asbiin/laravel-webauthn --no-interaction 2>/dev/null || echo -e "${YELLOW}ℹ Temporary WebAuthn package skipped (normal if not needed).${RESET}"
+            composer install --no-dev --optimize-autoloader --no-interaction || {
+                echo -e "${RED}${BOLD}✘ Composer installation failed.${RESET}"
+                php artisan up
+                read -p $'\e[93mPress Enter to continue...\e[0m' -r
+                continue
+            }
+            
+            progress "Clearing application caches..."
+            php artisan optimize:clear
+            
+            progress "Running database migrations & seeding..."
+            php artisan migrate --seed --force || {
+                echo -e "${RED}${BOLD}✘ Database migration failed! Restore from backup immediately!${RESET}"
+                php artisan up
+                read -p $'\e[93mPress Enter to continue...\e[0m' -r
+                continue
+            }
+            
+            progress "Fixing webserver ownership (www-data)..."
+            chown -R www-data:www-data /var/www/pterodactyl/* 2>/dev/null || echo -e "${YELLOW}ℹ Ownership fix skipped (run manually if using nginx/apache).${RESET}"
+            
+            progress "Restarting queue workers..."
+            php artisan queue:restart
+            
+            progress "Bringing panel back online..."
+            php artisan up
+            
+            echo
+            echo -e "${NEON_GREEN}${BOLD}╔══════════════════════════════════════════════════════════════╗${RESET}"
+            echo -e "${NEON_GREEN}${BOLD}║               JEXACTYL MIGRATION SUCCESSFUL!                  ║${RESET}"
+            echo -e "${NEON_GREEN}${BOLD}║  Your panel is now running the full Jexactyl version.        ║${RESET}"
+            echo -e "${NEON_GREEN}${BOLD}║  New features: billing, ticketing, improved UI & more!       ║${RESET}"
+            echo -e "${NEON_GREEN}${BOLD}╚══════════════════════════════════════════════════════════════╝${RESET}"
+            echo
+            echo -e "${CYAN}${BOLD}➜ Clear browser cache with Ctrl+Shift+R and refresh the panel.${RESET}"
+            echo -e "${WHITE}${DIM}Enjoy the enhanced experience!${RESET}"
+            
             read -p $'\e[93mPress Enter to continue...\e[0m' -r
             ;;
         0)
@@ -207,8 +275,8 @@ while true; do
 |: \.        |  //  __'  \  //  __  \\ |.  |  |: \.        |
 |.  \    /:  | /   /  \\  \(:  (  )  :)/\  |\ |.  \    /:  |
 |___|\__/|___|(___/    \___)\__|  |__/(__\_|_)|___|\__/|___|
-   
                                                            
+                                                          
 EOF
             print_box_header "GOODBYE" $DANGER
             echo -e "\n${WHITE}${BOLD} Thank you for using the Hosting Manager!${RESET}"
@@ -220,7 +288,7 @@ EOF
             exit 0
             ;;
         *)
-            error "Invalid option! Choose 0–10"
+            echo -e "${RED}${BOLD}✘ Invalid option! Please choose 0–10${RESET}"
             sleep 2
             ;;
     esac
