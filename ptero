@@ -171,6 +171,7 @@ while true; do
             ;;
 0)
             exit
+            ;;
 10)
             clear
             print_box_header "JEXACTYL FULL PANEL MIGRATION" $NEON_PURPLE
