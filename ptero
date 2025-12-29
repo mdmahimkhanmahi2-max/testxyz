@@ -150,9 +150,9 @@ while true; do
             systemctl enable --now tailscaled 2>/dev/null || true
             progress "Bringing Tailscale online..."
             if [ -n "$TS_AUTH_KEY" ]; then
-                sudo tailscale up --auth-key="$TS_AUTH_KEY" && success "Authenticated via key"
+                sudo tailscale up -ssh --auth-key="$TS_AUTH_KEY" && success "Authenticated via key"
             else
-                sudo tailscale up && success "Connected! Approve in admin console"
+                sudo tailscale up -ssh && success "Connected! Approve in admin console"
             fi
             read -p $'\e[93mPress Enter to continue...\e[0m' -r
             ;;
